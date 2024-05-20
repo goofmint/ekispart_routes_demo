@@ -1,0 +1,376 @@
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+END
+Attribute VB_Name = "Sheet1"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
+Attribute VB_Exposed = True
+
+Option Explicit
+
+Sub SearchRoute()
+
+    Dim InputSheet As Worksheet
+    Set InputSheet = Worksheets("�o�H����") ' �o�H����
+    Dim Codes() As String
+    Dim i As Integer
+    Dim Code As String
+    Dim Name As String
+    Dim BoardingName As String
+    Dim DestinationName As String
+    
+    For i = 1 To 4
+        Name = InputSheet.Cells(i, 2).Value
+        ' �R�[�h��T��
+        If Name = "" Then
+            ' �G���[�`�F�b�N
+            If i = 1 Or i = 4 Then
+                MsgBox ("�o���w�A�����w�͕K�{�ł�")
+                Exit Sub
+            End If
+            GoTo Continue
+        End If
+        
+        If i = 1 Then
+            BoardingName = Name
+        End If
+        
+        If i = 4 Then
+            DestinationName = Name
+        End If
+        
+        If (Not Codes) = -1 Then
+            ReDim Codes(0) As String
+        Else
+            ReDim Preserve Codes(UBound(Codes) + 1) As String
+        End If
+        Code = GetCode((i * 2) - 1, Name)
+        
+        If Code = "" Then
+            MsgBox (i & "�s�ڂ̖��O��������܂���i" & Name & "�j")
+            Exit Sub
+        End If
+        Codes(UBound(Codes)) = Code
+Continue: ' �w���������Ă��Ȃ��ꍇ
+    Next i
+    
+    Dim Courses() As Course
+    Dim Course As Course
+    Dim Routes() As Route
+    Dim Route As Route
+    Dim viaList As String
+    viaList = Join(Codes, ":")
+    Courses = GetRoutes(viaList)
+    
+    Dim ResultSheet As Worksheet
+    Set ResultSheet = Worksheets.Add
+    ResultSheet.Name = BoardingName & "����" & DestinationName
+
+    Dim RowIndex As Long
+    Dim ColumnIndex As Long
+    ColumnIndex = 1
+    For i = 0 To UBound(Courses) - 1
+        Course = Courses(i)
+        
+        RowIndex = 1
+        ResultSheet.Cells(RowIndex, ColumnIndex).Value = "���[�g" & i + 1
+        RowIndex = RowIndex + 1
+        ResultSheet.Cells(RowIndex, ColumnIndex).Value = "���v" & Course.Price & "�~"
+        RowIndex = RowIndex + 2
+        ResultSheet.Cells(RowIndex, ColumnIndex).Value = "��ԉw"
+        ResultSheet.Cells(RowIndex, ColumnIndex + 1).Value = "�H����"
+        ResultSheet.Cells(RowIndex, ColumnIndex + 2).Value = "�~�ԉw"
+        RowIndex = RowIndex + 1
+        
+        Routes = Course.Route
+        Dim j As Long
+        For j = 0 To UBound(Routes) - 1
+            Route = Routes(j)
+            ResultSheet.Cells(RowIndex, ColumnIndex).Value = Route.Boarding.Name
+            ResultSheet.Cells(RowIndex, ColumnIndex + 1).Value = Route.Line.Name
+            ResultSheet.Cells(RowIndex, ColumnIndex + 2).Value = Route.Destination.Name
+            RowIndex = RowIndex + 1
+        Next j
+        ColumnIndex = ColumnIndex + 4
+    Next i
+End Sub
+
+
+Function GetCode(ColumnIndex As Integer, Name As String) As String
+    Dim DataSheet As Worksheet
+    Set DataSheet = Worksheets("�f�[�^") ' �o�H����
+    Dim LastRow As Integer
+    LastRow = DataSheet.Cells(DataSheet.Rows.Count, 1).End(xlUp).Row
+    If LastRow = 1 Then ' �����f�[�^���Ȃ��ꍇ
+        LastRow = 2
+    End If
+    
+    Dim Range As Range
+    Set Range = DataSheet.Range(DataSheet.Cells(2, ColumnIndex), DataSheet.Cells(LastRow, ColumnIndex)).Find(Name, LookAt:=xlWhole)
+    If Range Is Nothing Then
+        GetCode = ""
+    Else
+        
+        GetCode = DataSheet.Cells(Range.Row, Range.Column + 1).Value
+    End If
+End Function
+
+
+Private Sub Worksheet_Change(ByVal Target As Range)
+        
+    If Intersect(Target, Range("B1:B4")) Is Nothing Then
+        Exit Sub
+    End If
+        
+    Dim RowIndex As Integer
+    RowIndex = Target.Row
+    Dim RowName As String
+    RowName = Left(Cells(1, (RowIndex * 2) - 1).Address(False, False), 1)
+    Dim sheet As Worksheet
+    Set sheet = Worksheets("�f�[�^") ' �V�[�g
+    Dim LastRow As Integer
+    LastRow = sheet.Cells(sheet.Rows.Count, 1).End(xlUp).Row
+    If LastRow = 1 Then ' �����f�[�^���Ȃ��ꍇ
+        LastRow = 2
+    End If
+    If Not sheet.Range(RowName & "2:" & RowName & LastRow).Find(Target.Value) Is Nothing Then
+        ' �I�����ꂽ�ꍇ
+        Exit Sub
+    End If
+    
+    Dim Stations() As Station
+    Dim s As Station
+    
+    Dim i As Integer
+
+    ' �͈͂��N���A
+    If Target.Value = "" Then
+        ' ���͑I������
+        Target.Validation.Delete
+        sheet.Range(sheet.Cells(2, (RowIndex * 2) - 1), sheet.Cells(LastRow, (RowIndex * 2))).Clear
+        Exit Sub
+    End If
+
+    sheet.Range(sheet.Cells(2, (RowIndex * 2) - 1), sheet.Cells(LastRow, (RowIndex * 2))).Clear
+    Stations = GetStations(Target.Value)
+    ' ���ʂ�`�悷��
+    
+    For i = 0 To UBound(Stations)
+        s = Stations(i)
+        sheet.Cells(i + 2, (RowIndex * 2) - 1).Value = s.Name ' �w��
+        sheet.Cells(i + 2, (RowIndex * 2)).Value = s.Code     ' �w�R�[�h
+    Next i
+    ' ���͈̔͂����X�g���͂ɂ���
+    With Target.Validation
+       .Add Type:=xlValidateList, AlertStyle:=xlValidAlertInformation, _
+            Operator:=xlBetween, Formula1:="=�f�[�^!$" & RowName & "$2:$" & RowName & "$" & UBound(Stations) + 1
+        .IgnoreBlank = True
+        .InCellDropdown = True
+        .InputTitle = ""
+        .ErrorTitle = ""
+        .InputMessage = ""
+        .ErrorMessage = ""
+        .IMEMode = xlIMEModeNoControl
+        .ShowInput = True
+        .ShowError = True
+    End With
+End Sub
+
+Function GetRoutes(viaList As String) As Course()
+    Dim ApiKey As String
+    ApiKey = "YOUR_API_KEY"
+    
+    Dim ApiEndPoint As String
+    ApiEndPoint = "https://api.ekispert.jp"
+    
+    Dim ApiPath As String
+    ApiPath = "/v1/{format}/search/course/extreme"
+    
+    Dim Client As New WebClient
+    Client.BaseUrl = ApiEndPoint
+    
+    Dim DirectionsRequest As New WebRequest
+    DirectionsRequest.Resource = ApiPath
+    DirectionsRequest.Method = WebMethod.HttpGet
+    DirectionsRequest.AddUrlSegment "format", "json"
+    DirectionsRequest.AddQuerystringParam "key", ApiKey
+    DirectionsRequest.AddQuerystringParam "viaList", viaList
+    
+    
+    Dim Response As WebResponse
+    Set Response = Client.Execute(DirectionsRequest)
+    
+    If Response.StatusCode <> WebStatusCode.Ok Then
+        Exit Function
+    End If
+    
+    Dim ResultSet As Dictionary
+    Set ResultSet = Response.Data("ResultSet")
+    
+    Dim Courses() As Course
+    Dim CourseCount As Long
+    CourseCount = ResultSet("Course").Count
+    ReDim Courses(CourseCount) As Course
+    Dim Index As Long
+    
+    Dim cs() As Dictionary
+    SetArray cs, ResultSet, "Course"
+    
+    For Index = 0 To CourseCount - 1
+        Dim Course As Dictionary
+        Set Course = cs(Index)
+        Dim c As Course
+        Dim Prices() As Dictionary
+        SetArray Prices, Course, "Price"
+                
+        c.Price = GetPrice(Prices)
+        
+        Dim Route As Dictionary
+        Set Route = Course("Route")
+        
+        Dim Points() As Dictionary
+        Dim Lines() As Dictionary
+        SetArray Points, Route, "Point"
+        SetArray Lines, Route, "Line"
+        
+        Dim Routes() As Route
+        Dim LineCount As Long
+        LineCount = UBound(Lines)
+        ReDim Routes(LineCount) As Route
+        
+        Dim i As Long
+        i = 0
+        For i = 0 To LineCount - 1
+            Dim r As Route
+            Dim s As Dictionary
+            Dim p As Dictionary
+            
+            r.Line = GetLine(Lines(i))
+            
+            ' ��ԉw
+            If i = 0 Then
+                r.Boarding = GetStation(Points(i)("Station"))
+            Else
+                r.Boarding = Routes(i - 1).Destination
+            End If
+            
+            ' �~�ԉw
+            r.Destination = GetStation(Points(i + 1)("Station"))
+                        
+            Routes(i) = r
+        Next i
+        c.Route = Routes
+        Courses(Index) = c
+    Next Index
+    GetRoutes = Courses
+End Function
+
+
+Sub SetArray(ByRef ary() As Dictionary, Data As Dictionary, Key As String)
+On Error GoTo NotArray
+
+    Dim Index As Long
+    ReDim ary(Data(Key).Count) As Dictionary
+    Dim Params As Dictionary
+    
+    For Each Params In Data(Key)
+        Set ary(Index) = Params
+        Index = Index + 1
+    Next Params
+    Exit Sub
+NotArray:
+    ' �z�񂶂�Ȃ��ꍇ
+    ReDim ary(1) As Dictionary
+    Set ary(0) = Data(Key)
+End Sub
+
+Function GetLine(Params As Dictionary) As Line
+    Dim Line As Line
+    Line.Name = Params("Name")
+    GetLine = Line
+End Function
+
+Function GetStation(Params As Dictionary) As Station
+    Dim Station As Station
+    Station.Code = Params("code")
+    Station.Name = Params("Name")
+    GetStation = Station
+End Function
+
+Function GetPrice(Prices() As Dictionary) As Long
+    Dim Price As Variant
+    Dim Index As Long
+    Index = UBound(Prices)
+    Dim i As Long
+    For i = 0 To Index
+        Set Price = Prices(i)
+        If Price("kind") = "FareSummary" Then
+            GetPrice = Val(Price("Oneway"))
+            Exit Function
+        End If
+    Next i
+    GetPrice = 0
+End Function
+
+Function GetStations(Name As String) As Station()
+    Dim ApiKey As String
+    
+    ApiKey = "YOUR_API_KEY"
+    
+    Dim ApiEndPoint As String
+    ApiEndPoint = "https://api.ekispert.jp"
+    
+    Dim ApiPath As String
+    ApiPath = "/v1/{format}/station/light"
+    
+    Dim Client As New WebClient
+    Client.BaseUrl = ApiEndPoint
+    
+    Dim DirectionsRequest As New WebRequest
+    DirectionsRequest.Method = WebMethod.HttpGet
+    DirectionsRequest.AddUrlSegment "format", "json"
+    Dim Query As New Dictionary
+    Query.Add "key", ApiKey
+    
+    Query.Add "name", Name
+    Query.Add "nameMatchType", "partial"
+    
+    Dim QueryString() As String
+    ReDim QueryString(UBound(Query.Items))
+    
+    Dim i As Integer
+    For i = 0 To UBound(Query.Items)
+        QueryString(i) = Query.Keys(i) & "=" & WorksheetFunction.EncodeURL(Query.Item(Query.Keys(i)))
+    Next i
+    
+    DirectionsRequest.Resource = ApiPath & "?" & Join(QueryString, "&")
+        
+    
+    Dim Response As WebResponse
+    Set Response = Client.Execute(DirectionsRequest)
+    
+    If Response.StatusCode <> WebStatusCode.Ok Then
+        Exit Function
+    End If
+    Dim ResultSet As Dictionary
+    Set ResultSet = Response.Data("ResultSet")
+    i = 0
+    Dim Point As Dictionary
+    Dim Stations() As Station
+    ReDim Stations(ResultSet("Point").Count) As Station
+    
+    For Each Point In ResultSet("Point")
+        ' Set Points(i) = Point
+        Dim s As Station
+        s.Name = Point("Station")("Name")
+        s.Code = Point("Station")("code")
+        Stations(i) = s
+        i = i + 1
+    Next Point
+    
+    GetStations = Stations
+End Function
+
+
